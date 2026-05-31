@@ -214,6 +214,7 @@ int main()
         try
         {
             TreeNode* root = buildAST(line);
+            printAST(root);
             cout << evaluate(root) << "\n";
             destroy(root);
         }
