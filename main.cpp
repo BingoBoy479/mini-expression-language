@@ -169,7 +169,7 @@ vector<Token> tokenize(const string& expr)
             bool curIsClose = tokens[i].kind   == Token::Kind::Char && tokens[i].ch   == ')';
             bool nextIsOpen = tokens[i+1].kind == Token::Kind::Char && tokens[i+1].ch == '(';
             bool nextIsNum  = tokens[i+1].kind == Token::Kind::Number;
-            bool nextIsVar  = tokens[i+1].kind   == Token::Kind::Variable;
+            bool nextIsVar  = tokens[i+1].kind == Token::Kind::Variable;
 
             if ( (curIsNum || curIsVar || curIsClose) && (nextIsOpen || nextIsVar || nextIsNum) )
                 result.push_back(makeChar('*'));
