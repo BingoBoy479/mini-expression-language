@@ -1,97 +1,116 @@
-# Expression Parser and AST Evaluator
+# AST-Based Expression Interpreter
 
-A C++ project that parses arithmetic expressions into an Abstract Syntax Tree (AST) using a stack-based parsing algorithm and recursively evaluates the resulting tree.
+A C++ interactive expression language that parses expressions into an Abstract Syntax Tree (AST) and evaluates them.
 
-This project was created as a learning step toward building a complete programming language compiler.
+This project was built as a stepping stone toward implementing a full compiler frontend. Instead of directly evaluating expressions, the interpreter first constructs an AST, making the architecture similar to real language implementations.
 
 ---
 
 ## Features
 
-- Multi-digit integer support
-- Operator precedence handling
-- Parentheses support
-- Implicit multiplication
+### Expressions
 
-Examples:
+Supported operators:
 
-```text
-2(3+4)
-(1+2)(3+4)
-5(2+3)*4
-```
-
-- AST generation
-- Recursive AST evaluation
-- Error handling
-
-```text
-Division by zero
-Mismatched parentheses
-Unknown tokens
-```
-
----
-
-## Supported Operators
-
-| Operator | Meaning |
-|-----------|----------|
+| Operator | Description |
+|-----------|------------|
 | + | Addition |
 | - | Subtraction |
 | * | Multiplication |
 | / | Division |
+| < | Less Than |
+| > | Greater Than |
 
----
-
-## Examples
-
-### Input
+### Variables
 
 ```text
-8*3+1*2
+x = 10
+y = 20
+x + y
 ```
 
-### Generated AST
+### Parentheses
 
 ```text
-+
-  *
-    8
-    3
-  *
-    1
-    2
+(1 + 2) * 3
 ```
 
-### Result
+### Implicit Multiplication
 
 ```text
-26
+2(3 + 4)
+(1 + 2)(3 + 4)
 ```
 
----
-
-### Input
+are automatically interpreted as
 
 ```text
-(1+2)*3
+2 * (3 + 4)
+(1 + 2) * (3 + 4)
 ```
 
-### Generated AST
+### AST Visualization
+
+Input:
 
 ```text
-*
+1 + 2 < 3 * 4
+```
+
+Generated AST:
+
+```text
+<
   +
     1
     2
-  3
+  *
+    3
+    4
 ```
 
-### Result
+### Interactive REPL
 
 ```text
-9
+>>> x = 8
+x = 8
+
+>>> y = 2
+y = 2
+
+>>> x < y
+0
+
+>>> x + 10
+18
+```
+
+---
+
+## Example
+
+### Input
+
+```text
+1+2<3*4
+```
+
+### AST
+
+```text
+<
+  +
+    1
+    2
+  *
+    3
+    4
+```
+
+### Evaluation
+
+```text
+1
 ```
 
 ---
@@ -99,53 +118,92 @@ Unknown tokens
 ## Architecture
 
 ```text
-Input String
-      |
-      v
-  Tokenizer
-      |
-      v
- Token Stream
-      |
-      v
- Stack-Based Parser
-      |
-      v
-      AST
-      |
-      v
- Recursive Evaluation
-      |
-      v
-    Result
+Input
+  |
+  v
+Tokenizer
+  |
+  v
+Token Stream
+  |
+  v
+Stack-Based AST Builder
+  |
+  v
+Abstract Syntax Tree
+  |
+  v
+Recursive Evaluation
 ```
 
 ---
 
-## Concepts Used
+## Internal Design
 
-- Abstract Syntax Trees (AST)
-- Stack-Based Parsing
-- Shunting Yard Inspired Parsing
-- Recursive Tree Traversal
-- Expression Evaluation
-- Dynamic Memory Management
+The parser uses:
+
+- Operand Stack
+- Operator Stack
+- Precedence-Based Reduction
+
+to construct an AST.
+
+Example:
+
+```text
+8 * 3 + 1 * 2
+```
+
+becomes
+
+```text
++
+├── *
+│   ├── 8
+│   └── 3
+└── *
+    ├── 1
+    └── 2
+```
+
+before evaluation.
 
 ---
 
-## Future Work
+## AST Node Types
 
+### Number
 
-- Unary Operators
-- Function Calls
-- Compiler Integration
+```text
+42
+```
+
+### Variable
+
+```text
+x
+```
+
+### Binary Expression
+
+```text
+x + y
+```
+
+```text
++
+├── x
+└── y
+```
 
 ---
 
 ## Build
 
+Compile:
+
 ```bash
-g++ -std=c++17 main.cpp -o parser
+g++ -std=c++17 parser.cpp -o parser
 ```
 
 Run:
@@ -158,4 +216,69 @@ Run:
 
 ## Motivation
 
-This project was built to understand how compilers transform source code into structured representations before semantic analysis and code generation.
+This project was created to understand:
+
+- Abstract Syntax Trees
+- Expression Parsing
+- Operator Precedence
+- Recursive Tree Traversal
+- Interpreter Design
+- Compiler Frontend Architecture
+
+The code serves as a prototype for a larger compiler project currently under development.
+
+---
+
+## Future Work
+
+- Unary Operators
+- Function Calls
+- Nested Function Calls
+- Additional Comparison Operators
+
+```text
+<=
+>=
+==
+!=
+```
+
+- Logical Operators
+
+```text
+&&
+||
+!
+```
+
+
+
+---
+
+## Sample Session
+
+```text
+>>> x = 8
+x = 8
+
+>>> y = 2
+y = 2
+
+>>> x < y
+<
+  x
+  y
+0
+
+>>> 1+2<3*4
+<
+  +
+    1
+    2
+  *
+    3
+    4
+1
+```
+
+---
