@@ -4,17 +4,25 @@
 #include <string>
 #include <unordered_map>
 #include <stdexcept>
+#include <cmath>
 using namespace std;
 
 const unordered_map<char, int> precedence =
 {
+    {'=',  1},
     {'>',  5},
     {'<',  5},
     {'+', 10},
     {'-', 10},
     {'*', 20},
     {'/', 20},
-    {'%', 20}
+    {'%', 20},
+    {'^', 30}
+};
+
+inline bool rightAssociative(char c)
+{
+    return (c =='=' || c == '^') ;
 };
 
 unordered_map<string,int> functionSizes = 
@@ -176,6 +184,7 @@ int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
         case '+': return lhs + rhs;
         case '-': return lhs - rhs;
         case '*': return lhs * rhs;
+        case '^': return pow(lhs,rhs);
         case '%': return lhs % rhs;
         case '/':
             if (rhs == 0) throw runtime_error("Division by zero");
@@ -420,13 +429,23 @@ TreeNode* buildAST(const vector<Token>& tokens)
                 i++;
             }
             else if (isOperator(ch))
-            {
-                while (!operators.empty() &&
-                       operators.top() != '(' &&
-                       precedence.at(operators.top()) >= precedence.at(ch))
-                {
-                    collapse(operands, operators);
-                }
+            {   
+                while(
+                        !operators.empty() &&
+                         operators.top() != '(' &&
+                        (
+                            precedence.at(operators.top()) > precedence.at(ch)
+                            ||
+                            (
+                                precedence.at(operators.top()) == precedence.at(ch)
+                                &&
+                                !rightAssociative(ch)
+                            )
+                        )
+                    )
+                    {
+                        collapse(operands, operators);
+                    }
                 operators.push(ch);
                 i++;
             }
