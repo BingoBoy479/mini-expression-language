@@ -388,6 +388,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
         if (tok.kind == Token::Kind::Number)
         {
             operands.push(makeNumberNode(tok.number));
+            i++;
         }
         else if (tok.kind == Token::Kind::Variable)
         {
@@ -396,7 +397,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
                 TreeNode* call = parseFunctionCall(tokens,i);
                 operands.push(call);
             }
-            else operands.push(makeVariableNode(tok.name));
+            else {operands.push(makeVariableNode(tok.name)); i++;}
         }
         else
         {
@@ -405,6 +406,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
             if (ch == '(')
             {
                 operators.push('(');
+                i++;
             }
             else if (ch == ')')
             {
@@ -413,6 +415,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
                 if (operators.empty())
                     throw runtime_error("Mismatched parentheses");
                 operators.pop();
+                i++;
             }
             else if (isOperator(ch))
             {
@@ -423,6 +426,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
                     collapse(operands, operators);
                 }
                 operators.push(ch);
+                i++;
             }
             else
             {
@@ -431,7 +435,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
         }
 
 
-        i++;
+        
     }
 
     while (!operators.empty())
