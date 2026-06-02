@@ -17,6 +17,7 @@ Supported operators:
 -
 *
 /
+%
 ```
 
 Examples:
