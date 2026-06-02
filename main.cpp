@@ -8,12 +8,19 @@ using namespace std;
 
 const unordered_map<char, int> precedence =
 {
-    {'>',5},
-    {'<',5},
+    {'>',  5},
+    {'<',  5},
     {'+', 10},
     {'-', 10},
     {'*', 20},
     {'/', 20}
+};
+
+unordered_map<string,int> functionSizes = 
+{
+    {"convertBool",1},
+    {"max"        ,2},
+    {"min"        ,2}
 };
 
 struct Token
@@ -27,20 +34,26 @@ Token makeNumber(int n) { Token t; t.kind = Token::Kind::Number;   t.number = n;
 Token makeChar(char c)  { Token t; t.kind = Token::Kind::Char;     t.ch = c;     return t; };
 Token makeVar(string s) { Token t; t.kind = Token::Kind::Variable; t.name = s;   return t; };
 
-enum class NodeType { Number, Binary, Variable };
+enum class NodeType { Number, Binary, Variable, CallExpr };
 
 struct TreeNode
 {
     NodeType type;
     union { int number; char op; };
     string name;
+    vector<TreeNode*> args;
     TreeNode* left  = nullptr;
     TreeNode* right = nullptr;
 };
 
-bool isOperator(char ch)
+inline bool isOperator(char ch)
 {
     return precedence.find(ch) != precedence.end();
+};
+
+inline bool isFunction(string s)
+{
+    return functionSizes.find(s) != functionSizes.end();
 };
 
 inline bool is_alpha(char c)
@@ -65,6 +78,15 @@ TreeNode* makeNumberNode(int value)
     return node;
 };
 
+TreeNode* makeFunctionNode(string name , vector<TreeNode*> args)
+{
+    TreeNode* node = new TreeNode;
+    node->type = NodeType::CallExpr;
+    node->name = name;
+    node->args = args;
+    return node;
+};
+
 TreeNode* makeBinaryNode(char op, TreeNode* lhs, TreeNode* rhs)
 {
     TreeNode* node = new TreeNode;
@@ -86,14 +108,37 @@ void collapse(stack<TreeNode*>& operands, stack<char>& operators)
 void printAST(TreeNode* node, int depth = 0)
 {
     if (!node) return;
-    for (int i = 0; i < depth; i++) cout << "  ";
-    if (node->type == NodeType::Number)       cout << node->number<< '\n';
-    else if(node->type == NodeType::Variable) cout << node->name  << '\n';
-    else                                      cout << node->op    << '\n';
+
+    for (int i = 0; i < depth; i++)
+        cout << "  ";
+
+    if (node->type == NodeType::Number)
+    {
+        cout << node->number << '\n';
+    }
+    else if (node->type == NodeType::Variable)
+    {
+        cout << node->name << '\n';
+    }
+    else if (node->type == NodeType::CallExpr)
+    {
+        cout << "Call(" << node->name << ")\n";
+
+        for(TreeNode* arg : node->args)
+        {
+            printAST(arg, depth + 1);
+        }
+
+        return;
+    }
+    else
+    {
+        cout << node->op << '\n';
+    }
+
     printAST(node->left,  depth + 1);
     printAST(node->right, depth + 1);
 };
-
 int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
     
     if (node->type == NodeType::Number) 
@@ -104,7 +149,23 @@ int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
             throw runtime_error("Undefined variable: " + node->name);
         return symbols[node->name];
     }
-    
+    if(node->type == NodeType::CallExpr)
+    {
+        if(node->name == "max")
+            return max(
+                evaluate(node->args[0], symbols),
+                evaluate(node->args[1], symbols)
+            );
+
+        else if(node->name == "min")
+            return min(
+                    evaluate(node->args[0], symbols),
+                    evaluate(node->args[1], symbols)
+            );
+        
+        else if(node->name == "convertBool")
+            return evaluate(node->args[0],symbols) != 0; 
+    }
     int lhs = evaluate(node->left,  symbols);
     int rhs = evaluate(node->right, symbols);
     
@@ -164,12 +225,12 @@ vector<Token> tokenize(const string& expr)
         result.push_back(tokens[i]);
         if (i + 1 < tokens.size())
         {
-            bool curIsNum   = tokens[i].kind   == Token::Kind::Number;
-            bool curIsVar   = tokens[i].kind   == Token::Kind::Variable;
-            bool curIsClose = tokens[i].kind   == Token::Kind::Char && tokens[i].ch   == ')';
-            bool nextIsOpen = tokens[i+1].kind == Token::Kind::Char && tokens[i+1].ch == '(';
-            bool nextIsNum  = tokens[i+1].kind == Token::Kind::Number;
-            bool nextIsVar  = tokens[i+1].kind == Token::Kind::Variable;
+            bool curIsNum   =(tokens[i].kind   == Token::Kind::Number)                                 ;
+            bool curIsVar   =(tokens[i].kind   == Token::Kind::Variable && !isFunction(tokens[i].name)) ;
+            bool curIsClose =(tokens[i].kind   == Token::Kind::Char && tokens[i].ch   == ')')          ;
+            bool nextIsOpen =(tokens[i+1].kind == Token::Kind::Char && tokens[i+1].ch == '(')          ;
+            bool nextIsNum  =(tokens[i+1].kind == Token::Kind::Number)                                 ;
+            bool nextIsVar  =(tokens[i+1].kind   == Token::Kind::Variable&& !isFunction(tokens[i].name));
 
             if ( (curIsNum || curIsVar || curIsClose) && (nextIsOpen || nextIsVar || nextIsNum) )
                 result.push_back(makeChar('*'));
@@ -178,22 +239,164 @@ vector<Token> tokenize(const string& expr)
     return result;
 };
 
-TreeNode* buildAST(const string& expression)
+TreeNode* buildAST(const vector<Token>& tokens);
+TreeNode* buildAST(const string& expression);
+
+TreeNode* parseFunctionCall(
+    const vector<Token>& token,
+    size_t& index
+)
 {
-    vector<Token> tokens = tokenize(expression);
+    string functionName = token[index].name;
+    index++;
+
+    if (
+        index >= token.size() ||
+        !(token[index].kind == Token::Kind::Char &&
+          token[index].ch == '(')
+    )
+    {
+        throw runtime_error(
+            "Function Error:: Expected '(' after function name"
+        );
+    }
+
+    index++; // consume '('
+
+    vector<TreeNode*> arguments;
+
+    while (true)
+    {
+        if(index >= token.size())
+        {
+            throw runtime_error(
+                "Function Error:: Missing ')'"
+            );
+        }
+
+        // max()
+        if(
+            token[index].kind == Token::Kind::Char &&
+            token[index].ch == ')'
+        )
+        {
+            break;
+        }
+
+        vector<Token> argTokens;
+        int depth = 0;
+
+        while(index < token.size())
+        {
+            if(
+                token[index].kind == Token::Kind::Char
+            )
+            {
+                if(token[index].ch == '(')
+                    depth++;
+
+                if(token[index].ch == ')')
+                {
+                    if(depth == 0)
+                        break;
+
+                    depth--;
+                }
+
+                if(
+                    token[index].ch == ',' &&
+                    depth == 0
+                )
+                {
+                    break;
+                }
+            }
+
+            argTokens.push_back(token[index]);
+            index++;
+        }
+
+        if(argTokens.empty())
+        {
+            throw runtime_error(
+                "Function Error:: Empty argument"
+            );
+        }
+
+        arguments.push_back(
+            buildAST(argTokens)
+        );
+
+        if(index >= token.size())
+        {
+            throw runtime_error(
+                "Function Error:: Missing ')'"
+            );
+        }
+
+        if(
+            token[index].kind == Token::Kind::Char &&
+            token[index].ch == ','
+        )
+        {
+            index++; // consume comma
+            continue;
+        }
+
+        if(
+            token[index].kind == Token::Kind::Char &&
+            token[index].ch == ')'
+        )
+        {
+            break;
+        }
+
+        throw runtime_error(
+            "Function Error:: Expected ',' or ')'"
+        );
+    }
+
+    index++; // consume ')'
+
+    if(arguments.size() != functionSizes[functionName])
+    {
+        throw runtime_error(
+            "Function Error:: Wrong number of arguments"
+        );
+    }
+
+    TreeNode* node = new TreeNode;
+    node->type = NodeType::CallExpr;
+    node->name = functionName;
+    node->args = move(arguments);
+
+    return node;
+};
+
+TreeNode* buildAST(const vector<Token>& tokens)
+{
 
     stack<TreeNode*> operands;
     stack<char>      operators;
+    size_t i = 0;
 
-    for (const Token& tok : tokens)
+    while(i < tokens.size())
     {
+        const Token tok = tokens[i];
+
+
         if (tok.kind == Token::Kind::Number)
         {
             operands.push(makeNumberNode(tok.number));
         }
         else if (tok.kind == Token::Kind::Variable)
         {
-            operands.push(makeVariableNode(tok.name));
+            if(isFunction(tok.name))
+            {
+                TreeNode* call = parseFunctionCall(tokens,i);
+                operands.push(call);
+            }
+            else operands.push(makeVariableNode(tok.name));
         }
         else
         {
@@ -226,6 +429,9 @@ TreeNode* buildAST(const string& expression)
                 throw runtime_error(string("Unknown token: ") + ch);
             }
         }
+
+
+        i++;
     }
 
     while (!operators.empty())
@@ -236,6 +442,11 @@ TreeNode* buildAST(const string& expression)
     }
 
     return operands.top();
+};
+
+TreeNode* buildAST(const string& expression)
+{
+    return buildAST(tokenize(expression));
 };
 
 int main() {
@@ -266,7 +477,15 @@ int main() {
             } else {
                 TreeNode* root = buildAST(line);
                 printAST(root);
-                cout << evaluate(root, symbols) << "\n";
+                if(root->type == NodeType::CallExpr &&
+                    root->name == "convertBool")
+                {
+                    cout << (evaluate(root,symbols)? "true" : "false") << "\n";
+                }
+                else
+                {
+                    cout << evaluate(root, symbols) << "\n";
+                }
                 destroy(root);
             }
         }
