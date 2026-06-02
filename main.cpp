@@ -13,7 +13,8 @@ const unordered_map<char, int> precedence =
     {'+', 10},
     {'-', 10},
     {'*', 20},
-    {'/', 20}
+    {'/', 20},
+    {'%', 20}
 };
 
 unordered_map<string,int> functionSizes = 
@@ -175,6 +176,7 @@ int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
         case '+': return lhs + rhs;
         case '-': return lhs - rhs;
         case '*': return lhs * rhs;
+        case '%': return lhs % rhs;
         case '/':
             if (rhs == 0) throw runtime_error("Division by zero");
             return lhs / rhs;
@@ -225,12 +227,12 @@ vector<Token> tokenize(const string& expr)
         result.push_back(tokens[i]);
         if (i + 1 < tokens.size())
         {
-            bool curIsNum   =(tokens[i].kind   == Token::Kind::Number)                                 ;
-            bool curIsVar   =(tokens[i].kind   == Token::Kind::Variable && !isFunction(tokens[i].name)) ;
-            bool curIsClose =(tokens[i].kind   == Token::Kind::Char && tokens[i].ch   == ')')          ;
-            bool nextIsOpen =(tokens[i+1].kind == Token::Kind::Char && tokens[i+1].ch == '(')          ;
-            bool nextIsNum  =(tokens[i+1].kind == Token::Kind::Number)                                 ;
-            bool nextIsVar  =(tokens[i+1].kind   == Token::Kind::Variable&& !isFunction(tokens[i].name));
+            bool curIsNum   = (tokens[i].kind   == Token::Kind::Number)                                  ;
+            bool curIsVar   = (tokens[i].kind   == Token::Kind::Variable && !isFunction(tokens[i].name)) ;
+            bool curIsClose = (tokens[i].kind   == Token::Kind::Char && tokens[i].ch   == ')')           ;
+            bool nextIsOpen = (tokens[i+1].kind == Token::Kind::Char && tokens[i+1].ch == '(')           ;
+            bool nextIsNum  = (tokens[i+1].kind == Token::Kind::Number)                                  ;
+            bool nextIsVar  = (tokens[i+1].kind   == Token::Kind::Variable&& !isFunction(tokens[i].name));
 
             if ( (curIsNum || curIsVar || curIsClose) && (nextIsOpen || nextIsVar || nextIsNum) )
                 result.push_back(makeChar('*'));
@@ -382,7 +384,7 @@ TreeNode* buildAST(const vector<Token>& tokens)
 
     while(i < tokens.size())
     {
-        const Token tok = tokens[i];
+        const Token& tok = tokens[i];
 
 
         if (tok.kind == Token::Kind::Number)
