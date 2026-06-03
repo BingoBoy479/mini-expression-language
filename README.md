@@ -19,6 +19,9 @@ Supported operators:
 /
 %
 ^
+!
+Unary Minus
+Unary Plus
 ```
 
 Examples:
@@ -305,13 +308,6 @@ The long-term goal is to use the ideas developed here in a larger custom languag
 ---
 
 ## Future Work
-
-* Unary Operators
-
-```text
--x
-+x
-```
 
 * Additional Comparison Operators
 
