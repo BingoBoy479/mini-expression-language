@@ -6,12 +6,26 @@
 #include <stdexcept>
 #include <cmath>
 using namespace std;
-
+const unordered_map<string,char> multiCharOps =
+{
+    {"<=", 'L'},
+    {">=", 'G'},
+    {"==", 'E'},
+    {"!=", 'N'},
+    {"&&", 'A'},
+    {"||", 'O'}
+};
 const unordered_map<char, int> precedence =
 {
     {'=',  1},
-    {'>',  5},
+    {'O',  2}, // ||
+    {'A',  3}, // &&
+    {'E',  4}, // ==
+    {'N',  4}, // !=
     {'<',  5},
+    {'>',  5},
+    {'L',  5}, // <=
+    {'G',  5}, // >=
     {'+', 10},
     {'-', 10},
     {'*', 20},
@@ -150,7 +164,19 @@ void collapse(stack<TreeNode*>& operands, stack<char>& operators)
         makeBinaryNode(op, lhs, rhs)
     );
 };
-
+void printOp(char op)
+{
+    switch(op)
+    {
+        case 'L': cout << "<="; break;
+        case 'G': cout << ">="; break;
+        case 'E': cout << "=="; break;
+        case 'N': cout << "!="; break;
+        case 'A': cout << "&&"; break;
+        case 'O': cout << "||"; break;
+        default:  cout << op;
+    }
+}
 void printAST(TreeNode* node, int depth = 0)
 {
     if (!node) return;
@@ -184,7 +210,8 @@ void printAST(TreeNode* node, int depth = 0)
     }
     else
     {
-        cout << node->op << '\n';
+        printOp(node->op);
+        cout << '\n';
     }
 
     printAST(node->left,  depth + 1);
@@ -192,9 +219,26 @@ void printAST(TreeNode* node, int depth = 0)
 };
 double evaluate(TreeNode* node, unordered_map<string, double>& symbols) {
     
+    if(node->type == NodeType::Binary && node->op == '=')
+    {
+        if(node->left->type != NodeType::Variable)
+        {
+            throw runtime_error(
+                "Left side of assignment must be a variable"
+            );
+        }
+
+        double value =
+            evaluate(node->right, symbols);
+
+        symbols[node->left->name] = value;
+
+        return value;
+    }
     if (node->type == NodeType::Number) 
         return node->number;
     
+
     if (node->type == NodeType::Variable) {
         if (symbols.find(node->name) == symbols.end())
             throw runtime_error("Undefined variable: " + node->name);
@@ -230,10 +274,18 @@ double evaluate(TreeNode* node, unordered_map<string, double>& symbols) {
         else if(node->name == "convertBool")
             return evaluate(node->args[0],symbols) != 0; 
     }
+    
     double lhs = evaluate(node->left,  symbols);
     double rhs = evaluate(node->right, symbols);
     
     switch (node->op) {
+        case 'L': return lhs <= rhs;  // <=
+        case 'G': return lhs >= rhs;  // >=
+        case 'E': return lhs == rhs;  // ==
+        case 'N': return lhs != rhs;  // !=
+
+        case 'A': return lhs && rhs;  // &&
+        case 'O': return lhs || rhs;  // ||
         case '<': return lhs < rhs;
         case '>': return lhs > rhs;
         case '+': return lhs + rhs;
@@ -280,6 +332,22 @@ vector<Token> tokenize(const string& expr)
         }
         else
         {
+            if(i + 1 < expr.size())
+            {
+                string two;
+                two.push_back(expr[i]);
+                two.push_back(expr[i + 1]);
+
+                auto it = multiCharOps.find(two);
+
+                if(it != multiCharOps.end())
+                {
+                    tokens.push_back(makeChar(it->second));
+                    i += 2;
+                    continue;
+                }
+            }
+
             tokens.push_back(makeChar(ch));
             i++;
         }
@@ -553,7 +621,6 @@ int main() {
 
     unordered_map<string, double> symbols;
     string line;
-
     while (true) {
         cout << ">>> ";
         if (!getline(cin, line)) break;
@@ -561,31 +628,20 @@ int main() {
         if (line == "exit" || line == "quit") break;
 
         try {
-            size_t eq = line.find('=');
-            if (eq != string::npos) {
-                string varName = line.substr(0, eq);
-                while (!varName.empty() && varName.back() == ' ')
-                    varName.pop_back();
-                string expr = line.substr(eq + 1);
-
-                TreeNode* root = buildAST(expr);
-                symbols[varName] = evaluate(root, symbols);
-                cout << varName << " = " << symbols[varName] << "\n";
-                destroy(root);
-            } else {
-                TreeNode* root = buildAST(line);
-                printAST(root);
-                if(root->type == NodeType::CallExpr &&
-                    root->name == "convertBool")
-                {
-                    cout << (evaluate(root,symbols)? "true" : "false") << "\n";
-                }
-                else
-                {
-                    cout << evaluate(root, symbols) << "\n";
-                }
-                destroy(root);
+            
+            TreeNode* root = buildAST(line);
+            printAST(root);
+            if(root->type == NodeType::CallExpr &&
+                root->name == "convertBool")
+            {
+                cout << (evaluate(root,symbols)? "true" : "false") << "\n";
             }
+            else
+            {
+                cout << evaluate(root, symbols) << "\n";
+            }
+            destroy(root);
+            
         }
         catch (const exception& e) {
             cout << "Error: " << e.what() << "\n";
