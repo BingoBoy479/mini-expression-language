@@ -323,5 +323,4 @@ The long-term goal is to use the ideas developed here in a larger custom languag
 ```text
 &&
 ||
-!
 ```
