@@ -1,78 +1,128 @@
-# Expression Interpreter
+# Mini Expression Language
 
-A C++ AST-based expression interpreter built as a stepping stone toward implementing a full compiler frontend.
+A small expression language interpreter written in C++ that supports arithmetic, variables, function calls, assignment expressions, logical operators, AST generation, and evaluation.
 
-The interpreter tokenizes user input, constructs an Abstract Syntax Tree (AST), visualizes the generated tree structure, and recursively evaluates expressions.
+This project was built as a step toward implementing a complete compiler frontend. The focus was on understanding lexing, parsing, abstract syntax trees, operator precedence, associativity, symbol tables, and basic semantic analysis.
 
 ---
 
 ## Features
 
-### Arithmetic Expressions
-
-Supported operators:
+### Arithmetic Operators
 
 ```text
-+
--
-*
-/
-%
-^
-!
-Unary Minus
-Unary Plus
++  -  *  /  %  ^
 ```
 
 Examples:
 
 ```text
-1 + 2 * 3
-(1 + 2) * 3
-8 * 9 - 70
+2 + 3 * 4
+(5 + 7) * 2
+2 ^ 3 ^ 2
+```
+
+---
+
+### Unary Operators
+
+```text
++x
+-x
+!x
+```
+
+Examples:
+
+```text
+-5
+--5
+!(1 < 2)
 ```
 
 ---
 
 ### Comparison Operators
 
-Supported operators:
-
 ```text
 <
 >
+<=
+>=
 ```
 
 Examples:
 
 ```text
 x < y
-10 > 5
-1 + 2 < 3 * 4
+x >= 10
+```
+
+---
+
+### Equality Operators
+
+```text
+==
+!=
+```
+
+Examples:
+
+```text
+x == y
+x != 0
+```
+
+---
+
+### Logical Operators
+
+```text
+&&
+||
+```
+
+Examples:
+
+```text
+x > 0 && y > 0
+x == 5 || y == 5
+```
+
+---
+
+### Assignment Expressions
+
+Assignments are implemented as expressions and are right-associative.
+
+Examples:
+
+```text
+x = 5
+y = x + 10
+a = b = c = 5
+x = (y = 7) + 2
 ```
 
 ---
 
 ### Variables
 
-Create and use variables interactively:
+Variables are stored in a symbol table and can be used in subsequent expressions.
+
+Example:
 
 ```text
->>> x = 8
-x = 8
-
->>> y = 2
-y = 2
-
->>> x + y
-10
+x = 5
+x + 10
 ```
 
 ---
 
 ### Built-in Functions
 
-Supported functions:
+Currently supported:
 
 ```text
 max(a,b)
@@ -84,141 +134,120 @@ Examples:
 
 ```text
 max(10,20)
-min(5,3)
+min(5,2)
 convertBool(0)
-convertBool(42)
-```
-
----
-
-### Nested Function Calls
-
-Function calls can be nested arbitrarily.
-
-Example:
-
-```text
-max(
-    max(1,2),
-    min(900,1000)
-)
-```
-
-Generated AST:
-
-```text
-Call(max)
-  Call(max)
-    1
-    2
-  Call(min)
-    900
-    1000
 ```
 
 ---
 
 ### Implicit Multiplication
 
-The interpreter automatically inserts multiplication where appropriate.
-
-Examples:
+The parser automatically inserts multiplication in cases such as:
 
 ```text
 2(3+4)
-(1+2)(3+4)
 2x
+(1+2)(3+4)
 ```
 
-become:
+which are interpreted as:
 
 ```text
 2*(3+4)
-(1+2)*(3+4)
 2*x
+(1+2)*(3+4)
 ```
 
 ---
 
-### AST Visualization
+## Implementation Overview
+
+### Lexer
+
+The lexer converts source text into tokens.
+
+Example:
+
+```text
+x >= 5 && y < 10
+```
+
+becomes:
+
+```text
+Identifier(x)
+Operator(>=)
+Number(5)
+Operator(&&)
+Identifier(y)
+Operator(<)
+Number(10)
+```
+
+---
+
+### Parser
+
+The parser uses a stack-based operator precedence algorithm inspired by the shunting-yard algorithm to construct an Abstract Syntax Tree (AST).
+
+The parser supports:
+
+* Operator precedence
+* Left associativity
+* Right associativity
+* Unary operators
+* Function calls
+* Assignment expressions
+
+---
+
+### AST
+
+Example:
 
 Input:
 
 ```text
-max(1+2,3*4)
+x = (y = 7) + 2
 ```
 
-Generated AST:
+AST:
 
 ```text
-Call(max)
-  +
-    1
-    2
-  *
-    3
-    4
-```
-
-Result:
-
-```text
-12
+=
+├── x
+└── +
+    ├── =
+    │   ├── y
+    │   └── 7
+    └── 2
 ```
 
 ---
 
-## Architecture
+### Evaluation
+
+The AST is recursively evaluated.
+
+Features include:
+
+* Variable lookup
+* Function evaluation
+* Assignment evaluation
+* Arithmetic evaluation
+* Logical evaluation
+* Basic semantic checks
+
+Example semantic error:
 
 ```text
-User Input
-    │
-    ▼
-Tokenizer
-    │
-    ▼
-Token Stream
-    │
-    ▼
-AST Builder
-    │
-    ▼
-Abstract Syntax Tree
-    │
-    ▼
-Recursive Evaluation
+5 = x
 ```
 
----
-
-## AST Node Types
-
-### Number
+Output:
 
 ```text
-42
-```
-
-### Variable
-
-```text
-x
-```
-
-### Binary Expression
-
-```text
-+
-├── 1
-└── 2
-```
-
-### Function Call
-
-```text
-Call(max)
-├── 1
-└── 2
+Error: Left side of assignment must be a variable
 ```
 
 ---
@@ -226,101 +255,47 @@ Call(max)
 ## Example Session
 
 ```text
->>> x = 8
-x = 8
+>>> x = 5
+5
 
->>> y = 2
-y = 2
+>>> y = x + 10
+15
 
->>> x < y
-0
+>>> x >= 3 && y <= 20
+1
 
->>> max(max(1,2),8*9-70)
+>>> max(x,y)
+15
 
-Call(max)
-  Call(max)
-    1
-    2
-  -
-    *
-      8
-      9
-    70
+>>> x = (y = 7) + 2
+9
 
-2
+>>> x
+9
+
+>>> y
+7
 ```
 
 ---
 
-## Error Handling
+## Concepts Learned
 
-The interpreter detects and reports:
+This project was built to explore compiler construction concepts including:
 
-```text
-Undefined variables
-Division by zero
-Mismatched parentheses
-Invalid function calls
-Incorrect argument counts
-Malformed expressions
-```
-
-Examples:
-
-```text
-Error: Undefined variable: x
-Error: Division by zero
-Error: Function Error:: Missing ')'
-```
+* Lexical analysis
+* Parsing
+* Abstract Syntax Trees
+* Operator precedence
+* Associativity
+* Recursive evaluation
+* Symbol tables
+* Semantic checks
+* Expression languages
 
 ---
 
-## Build
-
-Compile:
-
-```bash
-g++ -O2 -s parser.cpp -o parser
-```
-
-Run:
-
-```bash
-./parser
-```
-
----
 
 ## Motivation
 
-This project was built to understand:
-
-* Lexical Analysis
-* Abstract Syntax Trees
-* Expression Parsing
-* Recursive Tree Traversal
-* Operator Precedence
-* Interpreter Design
-* Compiler Frontend Architecture
-
-The long-term goal is to use the ideas developed here in a larger custom language and compiler project.
-
----
-
-## Future Work
-
-* Additional Comparison Operators
-
-```text
-<=
->=
-==
-!=
-```
-
-* Logical Operators
-
-```text
-&&
-||
-```
+This project serves as a learning platform for understanding how programming languages and compiler frontends are implemented. It is intended as a stepping stone toward building a complete compiler.
