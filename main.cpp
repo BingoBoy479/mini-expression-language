@@ -17,12 +17,15 @@ const unordered_map<char, int> precedence =
     {'*', 20},
     {'/', 20},
     {'%', 20},
-    {'^', 30}
+    {'^', 30},
+    {'~', 35},
+    {'#', 35},
+    {'!', 35}
 };
 
 inline bool rightAssociative(char c)
 {
-    return (c =='=' || c == '^') ;
+    return (c =='=' || c == '^' || c == '~' || c=='#' || c=='!') ;
 };
 
 unordered_map<string,int> functionSizes = 
@@ -39,11 +42,16 @@ struct Token
     string name;
 };
 
+inline bool isUnary(char ch , Token& NextTok)
+{
+    return ((ch == '+' || ch =='-'||ch=='!') && (NextTok.kind == Token::Kind::Variable || (NextTok.kind == Token::Kind::Char  && (NextTok.ch == '(' ) ) ) );
+}
+
 Token makeNumber(int n) { Token t; t.kind = Token::Kind::Number;   t.number = n; return t; };
 Token makeChar(char c)  { Token t; t.kind = Token::Kind::Char;     t.ch = c;     return t; };
 Token makeVar(string s) { Token t; t.kind = Token::Kind::Variable; t.name = s;   return t; };
 
-enum class NodeType { Number, Binary, Variable, CallExpr };
+enum class NodeType { Number, Binary, Variable, CallExpr, UnaryCall  };
 
 struct TreeNode
 {
@@ -70,6 +78,15 @@ inline bool is_alpha(char c)
     return (c >= 'a' && c <= 'z') ||
            (c >= 'A' && c <= 'Z');
 };
+
+TreeNode* makeUnaryNode(char op, TreeNode* lhs)
+{
+    TreeNode* node = new TreeNode;
+    node->type = NodeType::UnaryCall;
+    node->op   = op;
+    node->left  = lhs;
+    return node;
+}
 
 TreeNode* makeVariableNode(string name)
 {
@@ -108,10 +125,30 @@ TreeNode* makeBinaryNode(char op, TreeNode* lhs, TreeNode* rhs)
 
 void collapse(stack<TreeNode*>& operands, stack<char>& operators)
 {
-    char op       = operators.top(); operators.pop();
-    TreeNode* rhs = operands.top();  operands.pop();
-    TreeNode* lhs = operands.top();  operands.pop();
-    operands.push(makeBinaryNode(op, lhs, rhs));
+    char op = operators.top();
+    operators.pop();
+
+    if(op == '~' || op == '#' || op == '!')
+    {
+        TreeNode* child = operands.top();
+        operands.pop();
+
+        operands.push(
+            makeUnaryNode(op, child)
+        );
+
+        return;
+    }
+
+    TreeNode* rhs = operands.top();
+    operands.pop();
+
+    TreeNode* lhs = operands.top();
+    operands.pop();
+
+    operands.push(
+        makeBinaryNode(op, lhs, rhs)
+    );
 };
 
 void printAST(TreeNode* node, int depth = 0)
@@ -120,7 +157,12 @@ void printAST(TreeNode* node, int depth = 0)
 
     for (int i = 0; i < depth; i++)
         cout << "  ";
-
+    if(node->type == NodeType::UnaryCall)
+    {
+        cout << node->op << '\n';
+        printAST(node->left, depth+1);
+        return;
+    }
     if (node->type == NodeType::Number)
     {
         cout << node->number << '\n';
@@ -148,7 +190,7 @@ void printAST(TreeNode* node, int depth = 0)
     printAST(node->left,  depth + 1);
     printAST(node->right, depth + 1);
 };
-int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
+double evaluate(TreeNode* node, unordered_map<string, double>& symbols) {
     
     if (node->type == NodeType::Number) 
         return node->number;
@@ -158,25 +200,38 @@ int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
             throw runtime_error("Undefined variable: " + node->name);
         return symbols[node->name];
     }
+    if(node->type == NodeType::UnaryCall)
+    {
+        double val = evaluate(node->left, symbols);
+
+        switch(node->op)
+        {
+            case '~': return -val;
+            case '#': return val;
+            case '!': return !val;
+        }
+    }
     if(node->type == NodeType::CallExpr)
     {
         if(node->name == "max")
             return max(
-                evaluate(node->args[0], symbols),
+                evaluate(node->args[0], symbols)
+                ,
                 evaluate(node->args[1], symbols)
             );
 
         else if(node->name == "min")
             return min(
-                    evaluate(node->args[0], symbols),
+                    evaluate(node->args[0], symbols)
+                    ,
                     evaluate(node->args[1], symbols)
             );
         
         else if(node->name == "convertBool")
             return evaluate(node->args[0],symbols) != 0; 
     }
-    int lhs = evaluate(node->left,  symbols);
-    int rhs = evaluate(node->right, symbols);
+    double lhs = evaluate(node->left,  symbols);
+    double rhs = evaluate(node->right, symbols);
     
     switch (node->op) {
         case '<': return lhs < rhs;
@@ -185,7 +240,7 @@ int evaluate(TreeNode* node, unordered_map<string, int>& symbols) {
         case '-': return lhs - rhs;
         case '*': return lhs * rhs;
         case '^': return pow(lhs,rhs);
-        case '%': return lhs % rhs;
+        case '%': return fmod(lhs,rhs);
         case '/':
             if (rhs == 0) throw runtime_error("Division by zero");
             return lhs / rhs;
@@ -272,7 +327,7 @@ TreeNode* parseFunctionCall(
         );
     }
 
-    index++; // consume '('
+    index++; 
 
     vector<TreeNode*> arguments;
 
@@ -350,7 +405,7 @@ TreeNode* parseFunctionCall(
             token[index].ch == ','
         )
         {
-            index++; // consume comma
+            index++;
             continue;
         }
 
@@ -367,7 +422,7 @@ TreeNode* parseFunctionCall(
         );
     }
 
-    index++; // consume ')'
+    index++; 
 
     if(arguments.size() != functionSizes[functionName])
     {
@@ -390,9 +445,21 @@ TreeNode* buildAST(const vector<Token>& tokens)
     stack<TreeNode*> operands;
     stack<char>      operators;
     size_t i = 0;
-
+    bool expecting = true;
     while(i < tokens.size())
     {
+        if(i>0) 
+        {
+            const Token& prev = tokens[i-1];
+            if(prev.kind == Token::Kind::Number || (prev.kind == Token::Kind::Char && prev.ch ==')') || (prev.kind == Token::Kind::Variable && !isFunction(prev.name)))
+            {
+                expecting=false;
+            }
+            else if( (prev.kind == Token::Kind::Char && (prev.ch =='(' || prev.ch == ',' || isOperator(prev.ch)) ) || (prev.kind == Token::Kind::Variable && isFunction(prev.name)) )
+            {
+                expecting = true;
+            }
+        }
         const Token& tok = tokens[i];
 
 
@@ -430,6 +497,12 @@ TreeNode* buildAST(const vector<Token>& tokens)
             }
             else if (isOperator(ch))
             {   
+                if((ch == '-' || ch == '+' || ch =='!') && expecting)
+                {
+                    if(ch=='-' )ch = '~';
+                    else if(ch=='+')ch='#'; 
+                }
+        
                 while(
                         !operators.empty() &&
                          operators.top() != '(' &&
@@ -478,7 +551,7 @@ int main() {
     cout << "Expression Parser 1.0\n";
     cout << "Type an expression or assignment. 'exit' to quit.\n\n";
 
-    unordered_map<string, int> symbols;
+    unordered_map<string, double> symbols;
     string line;
 
     while (true) {
